@@ -30,10 +30,10 @@ func main() {
 		db      *genji.DB
 	)
 	flag.IntVar(&n, "n", 100, "number of records to insert")
-	flag.IntVar(&freq, "f", 10, "frequency of printing duration")
+	flag.IntVar(&freq, "f", 10, "number of actions to skip between each duration printing")
 	flag.StringVar(&scenario, "scenario", "", "scenario to run [required]")
 	flag.StringVar(&engine, "engine", "bolt", "engine to use [bolt, badger, memory]")
-	flag.StringVar(&dbname, "dbname", "", "name of the db")
+	flag.StringVar(&dbname, "dbname", "", "name of the database")
 	flag.BoolVar(&rm, "rm", false, "remove the database")
 	flag.Parse()
 
@@ -51,7 +51,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// If dbname flag is empty, the DB file is named by the scenario.
+	// If dbname flag is empty, the DB file is named after the scenario.
 	if dbname == "" {
 		dbname = fmt.Sprintf("%s.db", scenario)
 	}
