@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/genjidb/warzone"
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/genjidb/genji"
@@ -16,18 +17,24 @@ import (
 	"github.com/genjidb/genji/engine/memoryengine"
 )
 
-var scenarios = map[string]func(*genji.DB) (warzone.ExecerFunc, func() error){
+var scenarios = map[string]func(*genji.DB) (warzone.ExecerFunc, func(error) error){
 	"insert-all-types":         warzone.InsertAllTypes,
 	"insert-all-types-with-tx": warzone.InsertAllTypesWithTx,
 }
 
 func main() {
+	if err := main1(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func main1() error {
 	var (
 		scenario, dbname, engine string
 
 		n, freq int
 		rm      bool
-		db      *genji.DB
 	)
 	flag.IntVar(&n, "n", 100, "number of records to insert")
 	flag.IntVar(&freq, "f", 10, "number of actions to skip between each duration printing")
@@ -37,20 +44,26 @@ func main() {
 	flag.BoolVar(&rm, "rm", false, "remove the database")
 	flag.Parse()
 
-	if scenario == "" || (engine != "bolt" && engine != "badger" && engine != "memory") {
-		flag.Usage()
-		os.Exit(1)
-	}
+	_, found := scenarios[scenario]
+	switch {
+	case scenario == "":
+		return fmt.Errorf("flag -scenario is required")
 
-	if _, ok := scenarios[scenario]; !ok {
-		fmt.Printf("unknown test: %s\n", scenario)
-		fmt.Println("\nAvailable tests are:")
+	case !found:
+		fmt.Println("Available scenarios are:")
 		for k := range scenarios {
 			fmt.Println("-", k)
 		}
-		os.Exit(1)
+		return fmt.Errorf("unknown scenario: %v", scenario)
+
+	case engine != "bolt" && engine != "badger" && engine != "memory":
+		return fmt.Errorf("unsupported engine: %v", engine)
 	}
 
+	return setup(engine, dbname, scenario, rm, n, freq)
+}
+
+func setup(engine, dbname, scenario string, rm bool, n, freq int) (errs error) {
 	// If dbname flag is empty, the DB file is named after the scenario.
 	if dbname == "" {
 		dbname = fmt.Sprintf("%s.db", scenario)
@@ -58,37 +71,41 @@ func main() {
 
 	db, err := newEngine(engine, dbname)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		errs = multierror.Append(errs, err)
 	}
 
 	defer func() {
 		// If rm flag is true, remove the DB file.
 		if rm {
 			if err := os.RemoveAll(dbname); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
+				errs = multierror.Append(errs, err)
 			}
 		}
 	}()
 
-	ef, fn := scenarios[scenario](db)
+	ef, teardown := scenarios[scenario](db)
 	defer func() {
-		if fn != nil {
-			err := fn()
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err)
-				os.Exit(1)
+		if teardown != nil {
+			if err1 := teardown(err); err1 != nil {
+				errs = multierror.Append(errs, err1)
 			}
 		}
-
 		db.Close()
 	}()
 
-	if err := run(db, ef, n, freq); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	defer func() {
+		if r := recover(); r != nil {
+			errs = multierror.Append(errs, fmt.Errorf("scenario panicked: %v", r))
+		}
+	}()
+
+	err = run(db, ef, n, freq)
+	if err != nil {
+		errs = multierror.Append(errs, err)
 	}
+
+	// errs holds all potential errors
+	return errs
 }
 
 func run(db *genji.DB, fn warzone.ExecerFunc, n, freq int) error {

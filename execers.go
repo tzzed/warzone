@@ -26,7 +26,7 @@ const (
 )
 
 // InsertAllTypes insert all supported types.
-func InsertAllTypes(db *genji.DB) (ExecerFunc, func() error) {
+func InsertAllTypes(db *genji.DB) (ExecerFunc, func(error) error) {
 	err := db.Exec("CREATE TABLE IF NOT EXISTS " + tableName)
 	if err != nil {
 		// We shouldn't expect any error while creating a new table.
@@ -40,7 +40,7 @@ func InsertAllTypes(db *genji.DB) (ExecerFunc, func() error) {
 }
 
 // InsertAllTypesWithTx insert all supported types within a transaction.
-func InsertAllTypesWithTx(db *genji.DB) (ExecerFunc, func() error) {
+func InsertAllTypesWithTx(db *genji.DB) (ExecerFunc, func(error) error) {
 	err := db.Exec("CREATE TABLE IF NOT EXISTS " + tableName)
 	if err != nil {
 		// We shouldn't expect any error while creating a new table.
@@ -54,13 +54,9 @@ func InsertAllTypesWithTx(db *genji.DB) (ExecerFunc, func() error) {
 		panic(err)
 	}
 
-	fn := func() error {
-		if r := recover(); r != nil {
-			fmt.Println("recovered panic:", r)
-			err := tx.Rollback()
-			if err != nil {
-				return err
-			}
+	fn := func(err error) error {
+		if err != nil {
+			return tx.Rollback()
 		}
 		return tx.Commit()
 	}
