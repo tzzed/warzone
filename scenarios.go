@@ -6,8 +6,8 @@ import (
 	"github.com/genjidb/genji"
 )
 
-// ExecerFunc allows to execute any SQL statement against the given DB.
-type ExecerFunc func(*genji.DB) error
+// ScenarioFunc allows to execute any SQL statement against the given DB.
+type ScenarioFunc func(*genji.DB) error
 
 const (
 	tableName = "warzone"
@@ -26,7 +26,7 @@ const (
 )
 
 // InsertAllTypes insert all supported types.
-func InsertAllTypes(db *genji.DB) (ExecerFunc, func(error) error) {
+func InsertAllTypes(db *genji.DB) (ScenarioFunc, func(error) error) {
 	err := db.Exec("CREATE TABLE IF NOT EXISTS " + tableName)
 	if err != nil {
 		// We shouldn't expect any error while creating a new table.
@@ -40,7 +40,7 @@ func InsertAllTypes(db *genji.DB) (ExecerFunc, func(error) error) {
 }
 
 // InsertAllTypesWithTx insert all supported types within a transaction.
-func InsertAllTypesWithTx(db *genji.DB) (ExecerFunc, func(error) error) {
+func InsertAllTypesWithTx(db *genji.DB) (ScenarioFunc, func(error) error) {
 	err := db.Exec("CREATE TABLE IF NOT EXISTS " + tableName)
 	if err != nil {
 		// We shouldn't expect any error while creating a new table.

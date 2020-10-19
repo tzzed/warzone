@@ -17,7 +17,7 @@ import (
 	"github.com/genjidb/genji/engine/memoryengine"
 )
 
-var scenarios = map[string]func(*genji.DB) (warzone.ExecerFunc, func(error) error){
+var scenarios = map[string]func(*genji.DB) (warzone.ScenarioFunc, func(error) error){
 	"insert-all-types":         warzone.InsertAllTypes,
 	"insert-all-types-with-tx": warzone.InsertAllTypesWithTx,
 }
@@ -60,10 +60,10 @@ func main1() error {
 		return fmt.Errorf("unsupported engine: %v", engine)
 	}
 
-	return setup(engine, dbname, scenario, rm, n, freq)
+	return run(engine, dbname, scenario, rm, n, freq)
 }
 
-func setup(engine, dbname, scenario string, rm bool, n, freq int) (errs error) {
+func run(engine, dbname, scenario string, rm bool, n, freq int) (errs error) {
 	// If dbname flag is empty, the DB file is named after the scenario.
 	if dbname == "" {
 		dbname = fmt.Sprintf("%s.db", scenario)
@@ -99,7 +99,7 @@ func setup(engine, dbname, scenario string, rm bool, n, freq int) (errs error) {
 		}
 	}()
 
-	err = run(db, ef, n, freq)
+	err = runScenario(db, ef, n, freq)
 	if err != nil {
 		errs = multierror.Append(errs, err)
 	}
@@ -108,7 +108,7 @@ func setup(engine, dbname, scenario string, rm bool, n, freq int) (errs error) {
 	return errs
 }
 
-func run(db *genji.DB, fn warzone.ExecerFunc, n, freq int) error {
+func runScenario(db *genji.DB, fn warzone.ScenarioFunc, n, freq int) error {
 	fmt.Println("count,duration")
 
 	for i := 1; i <= n; i++ {
