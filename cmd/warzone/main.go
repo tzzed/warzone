@@ -6,8 +6,9 @@ import (
 	"os"
 	"time"
 
+	"go.uber.org/multierr"
+
 	"github.com/genjidb/warzone"
-	"github.com/hashicorp/go-multierror"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/genjidb/genji"
@@ -24,7 +25,7 @@ var scenarios = map[string]func(*genji.DB) (warzone.ScenarioFunc, func(error) er
 
 func main() {
 	if err := main1(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
@@ -71,14 +72,14 @@ func run(engine, dbname, scenario string, rm bool, n, freq int) (errs error) {
 
 	db, err := newEngine(engine, dbname)
 	if err != nil {
-		errs = multierror.Append(errs, err)
+		errs = multierr.Append(errs, err)
 	}
 
 	defer func() {
 		// If rm flag is true, remove the DB file.
 		if rm {
 			if err := os.RemoveAll(dbname); err != nil {
-				errs = multierror.Append(errs, err)
+				errs = multierr.Append(errs, err)
 			}
 		}
 	}()
@@ -87,7 +88,7 @@ func run(engine, dbname, scenario string, rm bool, n, freq int) (errs error) {
 	defer func() {
 		if teardown != nil {
 			if err1 := teardown(err); err1 != nil {
-				errs = multierror.Append(errs, err1)
+				errs = multierr.Append(errs, err1)
 			}
 		}
 		db.Close()
@@ -95,13 +96,13 @@ func run(engine, dbname, scenario string, rm bool, n, freq int) (errs error) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			errs = multierror.Append(errs, fmt.Errorf("scenario panicked: %v", r))
+			errs = multierr.Append(errs, fmt.Errorf("scenario panicked: %v", r))
 		}
 	}()
 
 	err = runScenario(db, ef, n, freq)
 	if err != nil {
-		errs = multierror.Append(errs, err)
+		errs = multierr.Append(errs, err)
 	}
 
 	// errs holds all potential errors
